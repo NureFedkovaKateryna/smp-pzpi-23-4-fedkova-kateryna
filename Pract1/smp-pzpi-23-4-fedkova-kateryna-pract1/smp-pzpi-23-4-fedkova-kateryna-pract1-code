@@ -1,1 +1,88 @@
+#! /bin/bash
 
+if [ "$#" -ne 2 ]; then
+    echo "Повинно бути два параметри" >&2
+    exit 1
+fi
+
+treeHeight=$1
+snowWidth=$2
+
+if ((treeHeight <= 0 || snowWidth <= 0)); then
+    echo "Неправильні аргументи" >&2
+    exit 2
+fi
+
+if ((snowWidth % 2 == 0)); then
+    snowWidth=$((snowWidth - 1))
+fi
+
+if (( snowWidth <= 5 || ( (treeHeight - snowWidth) != 1 && (treeHeight - snowWidth) != 2 ) )); then
+    echo "Ялинка не може бути побудована" >&2
+    exit 3
+fi
+
+if (( (treeHeight - snowWidth) == 2 )); then
+    treeHeight=$((treeHeight - 1))
+fi
+
+levelHeight=$(( $((treeHeight - 3)) / 2))
+topHeight=$((levelHeight + 1))
+bottomHeight=levelHeight
+
+number=1
+filledLine=""
+currentType="*"
+
+function drawLevel {
+    num=0
+    for (( level = 0; level < $1; level++ )); do
+        for (( space = 0; space < $(($((snowWidth / 2)) - level - $2)); space++ )); do
+            filledLine+=" "
+        done
+        until [ $num -ge $number ]; do
+            filledLine+="$currentType"
+            ((num++))
+        done
+        num=0
+        echo "$filledLine"
+        if [[ "$currentType" == "*" ]]; then
+            currentType="#"
+        else
+            currentType="*"
+        fi
+        filledLine=""
+        number=$((number + 2))
+    done
+}
+ 
+function drawTrunk {
+    for i in {0..1}; do
+        for ((space = 0; space < $(($((snowWidth / 2)) - 1)); space++ )); do
+            filledLine+=" "
+        done
+        filledLine+="###"
+        echo "$filledLine"
+        filledLine=""
+    done
+    filledLine=""
+}
+ 
+ 
+function drawSnow {
+    count=1
+    while [ "$count" -le "$snowWidth" ]; do
+        filledLine+="*"
+        ((count++))
+    done
+    echo "$filledLine"
+}
+ 
+drawLevel $topHeight 0
+ 
+number=3
+ 
+drawLevel $bottomHeight 1
+ 
+drawTrunk
+drawSnow
