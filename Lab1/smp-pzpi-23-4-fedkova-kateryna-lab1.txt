@@ -1,1 +1,608 @@
 
+Харківський національний університет радіоелектроніки
+Факультет комп’ютерних наук
+Катедра програмної інженерії
+ 
+ 
+Звіт
+з лабораторної роботи № 1 
+з дисципліни «Скриптові мови програмування»
+
+
+ 
+ 
+ 
+Виконала:                                                                         Перевірив:
+ст. гр. ПЗПІ-23-4                                                              ст. викладач кафедри ПІ
+Федькова Катерина                                                             Сокорчук Ігор Петрович
+ 
+ 
+ 
+Харків 2025
+1 ІСТОРІЯ ЗМІН
+
+
+№
+	Дата
+	Версія звіту
+	Опис змін та виправлень
+	1
+	20.04.2025
+	0.1
+	Зроблено звіт
+	
+
+2 ЗАВДАННЯ
+Метою даної роботи є ознайомитися з основними командами Bash для роботи з файлами та текстовими даними, навчитися використовувати команди select, ls, awk, sort, uniq, tee, cat, sed, iconv, а також розробити Bash-скрипт для перетворення CSV файла розкладу занять у придатний для імпорту в Google Календар CSV формат.
+
+
+3 ОПИС ВИКОНАНОЇ РОБОТИ
+Весь код для перетворення CSV файла розкладу занять у придатний для імпорту в Google Календар CSV формат знаходиться у додатку А. Перший рядок скрипта – це shebang, який вказує системі, як потрібно виконувати скрипт. 
+ 
+1 #! /bin/bash
+ 
+Оголошуємо змінні для зберігання групи, назви файлу, заголовку для нового файлу, а також значень переданих аргументів. 
+ 
+  3 groupName=""
+  4 fileName=""
+  5 printGoogleCalendarData=true
+  6 printHelp=false
+  7 printVersion=false
+  8 groupExists=false
+  9 singleGroup=false
+ 10 headers="Subject, \"Start Date\", \"Start Time\", \"End Date\", \"End Time\", Description"
+ 
+Ітеруємося по переданим аргументам та перевіряємо їх значення, встановлюємо необхідні значення змінним.
+ 
+ 13 for arg in "$@"
+ 14 do
+ 15     if [[ $arg == --help ]]; then
+ 16     printHelp=true
+ 17
+ 18     elif [[ $arg == --version ]]; then
+ 19     printVersion=true
+ 20
+ 21     elif [[ $arg == -q || $arg == --quiet ]]; then
+ 22     printGoogleCalendarData=false
+ 23
+ 24     elif [[ $arg == *.csv ]]; then
+ 25     fileName="$arg"
+ 26
+ 27     elif [[ $arg =~ ПЗПІ-23- ]]; then
+ 28     groupName="$arg"
+ 29     fi
+ 30 done
+ 
+Робимо перевірку на конфлікт параметрів та завершуємо роботу програми, якщо він є.
+ 33 if [[ "$printHelp" == true || "$printVersion" == true ]] && [[ "$printGoogleCalendarData" == false || -n "$groupName" || -n "$fileName" ]]; then
+ 34     echo "Помилка: не можна одночасно викликати --help/--version та -q/--quiet/академ_група/файл_із_cist.csv"
+ 35     exit 1
+ 36 fi
+ 
+Якщо printHelp встановлена в true, виводимо довідку та завершуємо роботу програми.
+ 
+ 39 if $printHelp; then
+ 40     echo "Синтаксис виклику: {ім'я облікового запису}-task2 [--help | --version] | [[-q | --quiet] [академ_група] файл_із_cist.csv] "
+ 41     exit 0
+ 42 fi
+ 
+ 
+Якщо printVersion встановлена в true, виводимо довідку та завершуємо роботу програми.
+ 
+ 45 if $printVersion; then
+ 46     echo "Версія 1.0"
+ 47     exit 0
+ 48 fi
+ 
+Робимо перевірку на наявність файлу. Якщо файлу не існує виводимо меню вибору для користувача з файлів, які відповідають умовам. Сортуємо їх за датою.
+ 
+ 51 if [ -z "$fileName" ]; then
+ 52     select file in $(ls | grep -E '^TimeTable_[0-9]{2}_[0-9]{2}_[0-9]{4}\.csv' | sort -t "_" -k4,4 -k3,3 -k2,2) QUIT; do
+ 53     if  [[ "$file" == "QUIT" ]]; then
+ 54         exit 0
+ 55     fi
+ 56     fileName="$file"
+ 57     break
+ 58     done
+ 59 fi
+ 
+Якщо обраний файл не існує, виводимо повідомлення та завершуємо роботу програми.
+ 
+ 62 if ! [ -f "$fileName" ]; then
+ 63     echo "Файл не існує" >&2
+ 64     exit  2
+ 65 fi
+ 
+Якщо обраний файл не доступний для читання, виводимо повідомлення та завершуємо роботу програми.
+ 
+ 68 if ! [ -r "$fileName" ]; then
+ 69         echo "Файл не доступний для читання" >&2
+ 70         exit 3
+ 71 fi
+ 
+ 
+Оголошуємо ім’я нового файлу.
+ 
+ 73 outputFileName="Google_$fileName"
+ 
+ 
+Оголошуємо функцію для виводу повідомлення про помилку та завершення програми у разі помилки при обробці файлу.
+ 
+ 76 function fileError() {
+ 77     echo "Помилка при обробці файлу" >&2
+ 78     exit 4
+ 79 }
+ 
+ 
+У змінну groupsInFile записуємо усі доступні групи з обраного файлу.
+ 
+ 82 groupsInFile=($(cat "$fileName" | sed 's/\r/ end\n/g' | iconv -f cp1251 -t utf-8 |
+ 83     awk 'BEGIN { FPAT="[^,]*|\"[^\"]*\"" }
+ 84         {
+ 85     gsub(/"/, "", $1)
+ 86     if ( $1 ~ /^ПЗПІ-23-/)
+ 87         print substr($1, 0, index($1, " "))
+ 88     else
+ 89         if (match($1, /ПЗПІ-23-[0-9]+/)) {
+ 90             print substr($1, RSTART, RLENGTH)
+ 91         }
+ 92     }' | sort | uniq)) || fileError
+ 
+ 
+Якщо у groupsInFile тільки одна група, записуємо її значення у змінну groupName.
+ 
+ 96 if [ ${#groupsInFile[@]} -eq 1 ]; then
+ 97     singleGroup=true
+ 98     groupName="${groupsInFile[0]}"
+ 99 fi
+ 
+ 
+Оголошуємо функцію для вибору групи.
+ 
+102 function selectGroup() {
+103         select group in "${groupsInFile[@]}" QUIT; do
+104         if [[ "$group" == "QUIT" ]]; then
+105             exit 0
+106         fi
+107         groupName="$group"
+108         break
+109         done
+110 }
+ 
+ 
+ 
+Якщо у groupName не передано значення при виклику програми, виводимо меню вибору для групи.
+ 
+113 if [ -z "$groupName" ]; then
+114         selectGroup
+115 fi
+ 
+ 
+Перевіряємо чи група існує у файлі.
+ 
+ 
+118 for group in "${groupsInFile[@]}"; do
+119         if [[ "$group" == "$groupName" ]]; then
+120         groupExists=true
+121         break
+122         fi
+123 done
+ 
+ 
+Якщо група не існує, виводимо повідомлення та виводимо меню вибору.
+ 
+126 if [[ "$groupExists" == false ]]; then
+127         echo "Група не знайдена в файлі! Оберіть іншу"
+128         selectGroup
+129 fi
+ 
+ 
+Оголошуємо функцію для отримання індексів колонок з обраного файлу та викликаємо цю функцію для всіх випадків.
+ 
+132 function getColumnNum() {
+133         columnIndex=$(cat "$fileName" | sed 's/\r/ end\n/g' | iconv -f cp1251 -t utf-8 |
+134         awk -v colName="$1" 'BEGIN { FPAT="[^,]*|\"[^\"]*\"" }
+135         NR==1 {
+136             for ( i = 1; i <= NF; i++) {
+137                 if ($i == "\"" colName "\"") {
+138                     print i
+139                     break
+140                 }
+141             }
+142         }') || fileError
+143         echo "$columnIndex"
+144 }
+145
+146 topicIndex=$(getColumnNum "Тема")
+147 startDateIndex=$(getColumnNum "Дата начала")
+148 startTimeIndex=$(getColumnNum "Время начала")
+149 endDateIndex=$(getColumnNum "Дата завершения")
+150 endTimeIndex=$(getColumnNum "Время завершения")
+151 descriptionIndex=$(getColumnNum "Описание")
+ 
+ 
+Форматуємо значення у обраному файлі згідно з умовами та створюємо новий файл.
+ 
+155 cat "$fileName" |
+156 sed 's/\r/ end\n/g' |
+157 iconv -f cp1251 -t utf-8 |
+158 awk -v startDate="$startDateIndex" -v startTime="$startTimeIndex" \
+159 'BEGIN { FPAT="[^,]*|\"[^\"]*\"" }
+160 NR > 1 {
+161         split($startDate, dateArr, ".")
+162         sortKey= dateArr[3] "-" dateArr[2] "-" dateArr[1] " " $startTime
+163         print sortKey "|" $0
+164 }' |
+165 sort |
+166 cut -d '|' -f2- |
+167 sed -E 's/([0-9]{2})\.([0-9]{2})\.([0-9]{4})/\2\/\1\/\3/g' |
+168 awk -v group="$groupName" -v topic="$topicIndex" -v startDate="$startDateIndex" -v startTime="$startTimeIndex" \
+169 -v endDate="$endDateIndex" -v endTime="$endTimeIndex" -v description="$descriptionIndex" -v single="$singleGroup" \
+170 'BEGIN { FPAT="[^,]*|\"[^\"]*\""; OFS="," }
+171 match($1, "^\"" group) || single == "true" {
+172         gsub(/"/, "", $(topic))
+173         if (single == "true") {
+174             topicInfo=$(topic)
+175         }
+176         else {
+177             topicInfo=substr($(topic), index($(topic), " ") + 3)
+178         }
+179
+180         if (index(topicInfo, ";") == 0) {
+181         getData()
+182         }
+183         else {
+184         delete subjectArr
+185                 split(topicInfo, parts, / *; */)
+186                 for (i in parts) {
+187             match(parts[i], /^*[[:space:]]*([[:alnum:]]+)/, arr)
+188             subject=arr[1]
+189             if (subject != "") {
+190                 if (subjectArr[subject] != "") {
+191                     subjectArr[subject]= subjectArr[subject] "; " parts[i]
+192                 } else {
+193                     subjectArr[subject] = parts[i]
+194                 }
+195             }
+196             }
+197
+198                 if (length(subjectArr) > 1) {
+199             for (i in subjectArr) {
+200                 topicInfo=subjectArr[i]
+201                 getData()
+202             }
+203                 }
+204             else {
+205                 getData()
+206                 }
+207         }
+208 }
+209
+210 function getData() {
+211         type=substr(topicInfo, index(topicInfo, " ") + 1, 2)
+212     startDateInfo=$(startDate)
+213     startTimeInfo=$(startTime)
+214     endDateInfo=$(endDate)
+215     endTimeInfo=$(endTime)
+216     descriptionInfo=$(description)
+217
+218     gsub(/"/, "", startTimeInfo)
+219     gsub(/"/, "", endTimeInfo)
+220
+221     split(startTimeInfo, startArr, ":")
+222     split(endTimeInfo, endArr, ":")
+223
+224     startTimeInfo=formatTime(startArr[1], startArr[2])
+225     endTimeInfo=formatTime(endArr[1], endArr[2])
+226
+227         key="\"" topicInfo type "\""
+228
+229         if (type != "Лб" || (type == "Лб" && labsAdded[key] % 2 == 0))
+230         count[key]++
+231         labsAdded[key]++
+232
+233         topicInfo = "\"" topicInfo "; №" count[key] "\""
+234
+235     print topicInfo, startDateInfo, startTimeInfo, endDateInfo, endTimeInfo, descriptionInfo
+236 }
+237
+238
+239 function formatTime(hours, minutes) {
+240         newTime=""
+241         if (hours == "00")
+242         newTime= "\"12:" minutes " AM\""
+243         else if (hours == "12")
+244         newTime="\"12:" minutes " PM\""
+245         else if (hours < 12)
+246         newTime= "\"" hours ":" minutes " AM\""
+247         else if (hours > 12)
+248         if (hours - 12 < 10)
+249             newTime="\"0" (hours - 12) ":" minutes " PM\""
+250         else
+251             newTime= "\"" (hours - 12) ":" minutes " PM\""
+252
+253         return newTime
+254 }' |
+255 if $printGoogleCalendarData; then
+256         echo "$headers" | tee "$outputFileName"
+257         tee -a "$outputFileName"
+258 else
+259         echo "$headers" | tee "$outputFileName" > /dev/null
+260         tee -a "$outputFileName" > /dev/null
+261 fi || fileError
+
+
+4 ВИСНОВКИ
+Під час виконання практичної роботи ознайомились з основними командами Bash для роботи з файлами та текстовими даними, навчилися використовувати команди select, ls, awk, sort, uniq, tee, cat, sed, iconv, а також розробили Bash-скрипт для перетворення CSV файла розкладу занять у придатний для імпорту в Google Календар CSV формат.
+
+
+ВИКОРИСТАНІ ДЖЕРЕЛА
+1. learnxinyminutes-docs/uk-ua/bash-ua.html.markdown at master · IhorSokorchuk/learnxinyminutes-docs. GitHub. URL: https://github.com/IhorSokorchuk/learnxinyminutes-docs/blob/master/uk-ua/bash-ua.html.markdown (дата звернення: 20.04.2025).
+2. learnxinyminutes-docs/uk-ua/awk-uk.html.markdown at master · IhorSokorchuk/learnxinyminutes-docs. GitHub. URL: https://github.com/IhorSokorchuk/learnxinyminutes-docs/blob/master/uk-ua/awk-uk.html.markdown (дата звернення: 20.04.2025).
+
+
+ДОДАТОК В
+
+
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/blob/main/Lab1/smp-pzpi-23-4-fedkova-kateryna-lab1/smp-pzpi-23-4-fedkova-kateryna-lab1-code
+  1 #!/bin/bash
+  2
+  3 groupName=""
+  4 fileName=""
+  5 printGoogleCalendarData=true
+  6 printHelp=false
+  7 printVersion=false
+  8 groupExists=false
+  9 singleGroup=false
+ 10 headers="Subject, \"Start Date\", \"Start Time\", \"End Date\", \"End Time\", Description"
+ 11
+ 12
+ 13 for arg in "$@"
+ 14 do
+ 15     if [[ $arg == --help ]]; then
+ 16     printHelp=true
+ 17
+ 18     elif [[ $arg == --version ]]; then
+ 19     printVersion=true
+ 20
+ 21     elif [[ $arg == -q || $arg == --quiet ]]; then
+ 22     printGoogleCalendarData=false
+ 23
+ 24     elif [[ $arg == *.csv ]]; then
+ 25     fileName="$arg"
+ 26
+ 27     elif [[ $arg =~ ПЗПІ-23- ]]; then
+ 28     groupName="$arg"
+ 29     fi
+ 30 done
+ 31
+ 32
+ 33 if [[ "$printHelp" == true || "$printVersion" == true ]] && [[ "$printGoogleCalendarData" == false || -n "$groupName" || -n "$fileName" ]]; then
+ 34     echo "Помилка: не можна одночасно викликати --help/--version та -q/--quiet/академ_група/файл_із_cist.csv"
+ 35     exit 1
+ 36 fi
+ 37
+ 38
+ 39 if $printHelp; then
+ 40     echo "Синтаксис виклику: {ім'я облікового запису}-task2 [--help | --version] | [[-q | --quiet] [академ_група] файл_із_cist.csv] "
+ 41     exit 0
+ 42 fi
+ 43
+ 44
+ 45 if $printVersion; then
+ 46     echo "Версія 1.0"
+ 47     exit 0
+ 48 fi
+ 49
+ 50
+ 51 if [ -z "$fileName" ]; then
+ 52     select file in $(ls | grep -E '^TimeTable_[0-9]{2}_[0-9]{2}_[0-9]{4}\.csv' | sort -t "_" -k4,4 -k3,3 -k2,2) QUIT; do
+ 53     if  [[ "$file" == "QUIT" ]]; then
+ 54         exit 0
+ 55     fi
+ 56     fileName="$file"
+ 57     break
+ 58     done
+ 59 fi
+ 60
+ 61
+ 62 if ! [ -f "$fileName" ]; then
+ 63     echo "Файл не існує" >&2
+ 64     exit  2
+ 65 fi
+ 66
+ 67
+ 68 if ! [ -r "$fileName" ]; then
+ 69         echo "Файл не доступний для читання" >&2
+ 70         exit 3
+ 71 fi
+ 72
+ 73 outputFileName="Google_$fileName"
+ 74
+ 75
+ 76 function fileError() {
+ 77     echo "Помилка при обробці файлу" >&2
+ 78     exit 4
+ 79 }
+ 80
+ 81
+ 82 groupsInFile=($(cat "$fileName" | sed 's/\r/ end\n/g' | iconv -f cp1251 -t utf-8 |
+ 83     awk 'BEGIN { FPAT="[^,]*|\"[^\"]*\"" }
+ 84         {
+ 85     gsub(/"/, "", $1)
+ 86     if ( $1 ~ /^ПЗПІ-23-/)
+ 87         print substr($1, 0, index($1, " "))
+ 88     else
+ 89         if (match($1, /ПЗПІ-23-[0-9]+/)) {
+ 90             print substr($1, RSTART, RLENGTH)
+ 91         }
+ 92     }' | sort | uniq)) || fileError
+ 93
+ 94
+ 95
+ 96 if [ ${#groupsInFile[@]} -eq 1 ]; then
+ 97     singleGroup=true
+ 98     groupName="${groupsInFile[0]}"
+ 99 fi
+100
+101
+102 function selectGroup() {
+103         select group in "${groupsInFile[@]}" QUIT; do
+104         if [[ "$group" == "QUIT" ]]; then
+105             exit 0
+106         fi
+107         groupName="$group"
+108         break
+109         done
+110 }
+111
+112
+113 if [ -z "$groupName" ]; then
+114         selectGroup
+115 fi
+116
+117
+118 for group in "${groupsInFile[@]}"; do
+119         if [[ "$group" == "$groupName" ]]; then
+120         groupExists=true
+121         break
+122         fi
+123 done
+124
+125
+126 if [[ "$groupExists" == false ]]; then
+127         echo "Група не знайдена в файлі! Оберіть іншу"
+128         selectGroup
+129 fi
+130
+131
+132 function getColumnNum() {
+133         columnIndex=$(cat "$fileName" | sed 's/\r/ end\n/g' | iconv -f cp1251 -t utf-8 |
+134         awk -v colName="$1" 'BEGIN { FPAT="[^,]*|\"[^\"]*\"" }
+135         NR==1 {
+136             for ( i = 1; i <= NF; i++) {
+137                 if ($i == "\"" colName "\"") {
+138                     print i
+139                     break
+140                 }
+141             }
+142         }') || fileError
+143         echo "$columnIndex"
+144 }
+145
+146 topicIndex=$(getColumnNum "Тема")
+147 startDateIndex=$(getColumnNum "Дата начала")
+148 startTimeIndex=$(getColumnNum "Время начала")
+149 endDateIndex=$(getColumnNum "Дата завершения")
+150 endTimeIndex=$(getColumnNum "Время завершения")
+151 descriptionIndex=$(getColumnNum "Описание")
+152
+153
+154
+155 cat "$fileName" |
+156 sed 's/\r/ end\n/g' |
+157 iconv -f cp1251 -t utf-8 |
+158 awk -v startDate="$startDateIndex" -v startTime="$startTimeIndex" \
+159 'BEGIN { FPAT="[^,]*|\"[^\"]*\"" }
+160 NR > 1 {
+161         split($startDate, dateArr, ".")
+162         sortKey= dateArr[3] "-" dateArr[2] "-" dateArr[1] " " $startTime
+163         print sortKey "|" $0
+164 }' |
+165 sort |
+166 cut -d '|' -f2- |
+167 sed -E 's/([0-9]{2})\.([0-9]{2})\.([0-9]{4})/\2\/\1\/\3/g' |
+168 awk -v group="$groupName" -v topic="$topicIndex" -v startDate="$startDateIndex" -v startTime="$startTimeIndex" \
+169 -v endDate="$endDateIndex" -v endTime="$endTimeIndex" -v description="$descriptionIndex" -v single="$singleGroup" \
+170 'BEGIN { FPAT="[^,]*|\"[^\"]*\""; OFS="," }
+171 match($1, "^\"" group) || single == "true" {
+172         gsub(/"/, "", $(topic))
+173         if (single == "true") {
+174             topicInfo=$(topic)
+175         }
+176         else {
+177             topicInfo=substr($(topic), index($(topic), " ") + 3)
+178         }
+179
+180         if (index(topicInfo, ";") == 0) {
+181         getData()
+182         }
+183         else {
+184         delete subjectArr
+185                 split(topicInfo, parts, / *; */)
+186                 for (i in parts) {
+187             match(parts[i], /^*[[:space:]]*([[:alnum:]]+)/, arr)
+188             subject=arr[1]
+189             if (subject != "") {
+190                 if (subjectArr[subject] != "") {
+191                     subjectArr[subject]= subjectArr[subject] "; " parts[i]
+192                 } else {
+193                     subjectArr[subject] = parts[i]
+194                 }
+195             }
+196             }
+197
+198                 if (length(subjectArr) > 1) {
+199             for (i in subjectArr) {
+200                 topicInfo=subjectArr[i]
+201                 getData()
+202             }
+203                 }
+204             else {
+205                 getData()
+206                 }
+207         }
+208 }
+209
+210 function getData() {
+211         type=substr(topicInfo, index(topicInfo, " ") + 1, 2)
+212         startDateInfo=$(startDate)
+213         startTimeInfo=$(startTime)
+214         endDateInfo=$(endDate)
+215         endTimeInfo=$(endTime)
+216         descriptionInfo=$(description)
+217
+218         gsub(/"/, "", startTimeInfo)
+219         gsub(/"/, "", endTimeInfo)
+220
+221         split(startTimeInfo, startArr, ":")
+222         split(endTimeInfo, endArr, ":")
+223
+224         startTimeInfo=formatTime(startArr[1], startArr[2])
+225         endTimeInfo=formatTime(endArr[1], endArr[2])
+226
+227         key="\"" topicInfo type "\""
+228
+229         if (type != "Лб" || (type == "Лб" && labsAdded[key] % 2 == 0))
+230         count[key]++
+231         labsAdded[key]++
+232
+233         topicInfo = "\"" topicInfo "; №" count[key] "\""
+234
+235         print topicInfo, startDateInfo, startTimeInfo, endDateInfo, endTimeInfo, descriptionInfo
+236 }
+237
+238
+239 function formatTime(hours, minutes) {
+240         newTime=""
+241         if (hours == "00")
+242         newTime= "\"12:" minutes " AM\""
+243         else if (hours == "12")
+244         newTime="\"12:" minutes " PM\""
+245         else if (hours < 12)
+246         newTime= "\"" hours ":" minutes " AM\""
+247         else if (hours > 12)
+248         if (hours - 12 < 10)
+249             newTime="\"0" (hours - 12) ":" minutes " PM\""
+250         else
+251             newTime= "\"" (hours - 12) ":" minutes " PM\""
+252
+253         return newTime
+254 }' |
+255 if $printGoogleCalendarData; then
+256         echo "$headers" | tee "$outputFileName"
+257         tee -a "$outputFileName"
+258 else
+259         echo "$headers" | tee "$outputFileName" > /dev/null
+260         tee -a "$outputFileName" > /dev/null
+261 fi || fileError
