@@ -1,1 +1,393 @@
+Харківський національний університет радіоелектроніки
+Факультет комп’ютерних наук
+Катедра програмної інженерії
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+ЗВІТ
+з лабораторної роботи № 2 
+з дисципліни «Скриптові мови програмування»
+на тему: «Продовольчий магазин "Весна"»
+
+
+
+
+
+
+
+
+Виконала
+ст. гр. ПЗПІ-23-4
+Федькова Катерина
+Перевірив
+ст. викладач катедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+Харків 2025
+1 ІСТОРІЯ ЗМІН
+№
+	Дата
+	Версія звіту
+	Опис змін та виправлень
+	1
+	17.05.2025
+	0.1
+	Створено звіт»
+	
+
+2 ЗАВДАННЯ
+Метою даної роботи є створення консольного застосунку «Продовольчий магазин "Весна"», який імітує взаємодію користувача з магазином у терміналі. Після запуску застосунку на екран має виводитися головне меню. Програма очікує введення команди з клавіатури. У випадку введення некоректної команди, виводиться повідомлення про помилку, і список дій відображається повторно. При виборі команди 1 користувач переходить до режиму закупівлі, де виводиться список продуктів з номерами, назвами та цінами. Користувач вводить номер товару, після чого програма перевіряє його на коректність та запитує кількість одиниць для додавання до кошика. При виборі команди 3 програма просить ввести ім’я та вік користувача.  Ім’я не повинно бути порожнім і має містити хоча б одну літеру. Вік має бути в межах від 7 до 150 років. Команда 0 завершує виконання застосунку.
+3 ОПИС ВИКОНАНОЇ РОБОТИ
+Весь код завдання знаходиться у додатку В. Спочатку вказуємо відкриваючий тег та оголошуємо масиви з необхідною інформацією.
+  1 <?php
+  2
+  3 $menuOptions = ['1' => 'Вибрати товари', '2' => 'Отримати підсумковий рахунок', '3' => 'Налаштувати свій профіль', '0' => 'Вийти з програми'];
+  4
+  5 $productsOptions = ['1' => ['Молоко пастеризоване', 12], '2' => ['Хліб чорний', 9], '3' => ['Сир білий', 21], '4' => ['Сметана 20%', 25], '5' => ['Кефір 1% ', 19], '6' => ['Вода газована', 18], '7' => ['Печиво "Весна"', 14]];
+  6
+  7 $bag = [];
+
+
+Оголошуємо фінкцію show_menu, яка виводить нумероване текстове меню, функцію text_length, яка рахує кількість символів у рядку та функцію show_goods, яка виводить список товарів у табличному форматі з вирівнюванням назв і цін.
+  
+  9 function show_menu($menuOptions) {
+ 10     foreach ($menuOptions as $num => $text) {
+ 11         print $num . ' ' . $text . "\n";
+ 12     }
+ 13 }
+ 14
+ 15 function text_length($text) {
+ 16     preg_match_all('/./u', $text, $matches);
+ 17     return count($matches[0]);
+ 18 }
+ 19
+ 20 function show_goods($productsOptions) {
+ 21     print "№  НАЗВА                 ЦІНА\n";
+ 22     foreach ($productsOptions as $num => $product) {
+ 23         $title = $product[0];
+ 24         $price = $product[1];
+ 25         $padding = 22 - text_length($title);
+ 26         if ($padding < 0) {
+ 27             $padding = 0;
+ 28         }
+ 29         print $num . str_repeat(' ', 2) . $title . str_repeat(' ', $padding) . $price . "\n";
+ 30     }
+ 31     print "   -----------\n";
+ 32     print "0  ПОВЕРНУТИСЯ\n";
+ 33 }
+Оголошуємо функцію get_option, яка є універсальною функцією для отримання вибору користувача зі списку опцій, функцію get_name та get_age, які отримують імʼя та вік користувача, перевіряючи правильність введення, а також функцію get_quanity, яка отримує кількість одиниць товару з перевіркою на коректність.
+
+
+ 35 function get_option($text, $errorText, $func, $options) {
+ 36     $option = -1;
+ 37     do {
+ 38             call_user_func($func, $options);
+ 39             print "$text";
+ 40             $option = trim(fgets(STDIN));
+ 41             if (!in_array($option, array_keys($options)) && $option != 0) {
+ 42                     print "$errorText\n";
+ 43             }
+ 44     } while (!in_array($option, array_keys($options)) && $option != 0);
+ 45     return $option;
+ 46 }
+ 47
+ 48 function get_name() {
+ 49     $name = '';
+ 50     do {
+ 51         print 'Ваше імʼя: ';
+ 52             $name = trim(fgets(STDIN));
+ 53     } while ($name == '' || preg_match_all('/[^a-zA-Zа-яА-ЯіїєґІЇЄҐ]/u', $name));
+ 54     return $name;
+ 55 }
+ 56
+ 57 function get_age() {
+ 58     $age = 0;
+ 59     do {
+ 60         print 'Ваш вік: ';
+ 61             $age = trim(fgets(STDIN));
+ 62     } while (preg_match('/[^0-9]/', $age) || $age < 7 || $age > 150);
+ 63     return $age;
+ 64 }
+ 65
+ 66 function get_quantity() {
+ 67     $quantity = -1;
+ 68     do {
+ 69         print 'Введіть кількість, штук: ';
+ 70         $quantity = trim(fgets(STDIN));
+ 71     } while (preg_match('/[^[1-9]]/', $quantity) || $quantity < 0 || $quantity > 99);
+ 72     return $quantity;
+ 73 }
+
+
+Оголошуємо функцію update_bag, яка оновлює вміст кошика користувача,  додає або видаляє товар залежно від кількості.Використовується глобальна змінна bag, яка представляє «кошик» користувача у вигляді асоціативного масиву.
+
+
+ 76 function update_bag($product, $quantity) {
+ 77     global $bag;
+ 78     if ($quantity == 0) {
+ 79         print "ВИДАЛЯЮ З КОШИКА\n";
+ 80         unset($bag[$product]);
+ 81         return;
+ 82     }
+ 83
+ 84     if (!in_array($product, array_keys($bag))) {
+ 85         $bag[$product] = $quantity;
+ 86     } else {
+ 87         $bag[$product] += $quantity;
+ 88     }
+ 89 }
+
+
+Оголошуємо функцію print_bag, яка виводить вміст кошика користувача - назви товарів і їх кількість у відформатованому вигляді.
+
+
+ 92 function print_bag($bag, $productsOptions) {
+ 93     if (count($bag) == 0) {
+ 94         print "КОШИК ПОРОЖНІЙ\n";
+ 95         return;
+ 96     }
+ 97
+ 98     print "У КОШИКУ:\n";
+ 99     print "НАЗВА                 КІЛЬКІСТЬ\n";
+100     foreach ($bag as $productId => $productCount) {
+101         $title = $productsOptions[$productId][0];
+102         $padding = 22 - text_length($title);
+103         if ($padding < 0) {
+104             $padding = 0;
+105         }
+106         print $title . str_repeat(' ', $padding) . $productCount . "\n";
+107     }
+108 }
+
+
+Виводимо заголовок магазину у консолі. Виводимо головне меню та запитуємо команду. Програма працює, поки користувач не введе 0. Якщо обрано 1, то можна обрати товари та додати їх у кошик. Якщо обрано 2, то формується таблиця з товарами в кошику та обраховується підсумкова сума. Якщо обрано 3, то у користувача запитується ім’я та вік.
+
+
+111 print "################################\n";
+112 print "# ПРОДОВОЛЬЧИЙ МАГАЗИН \"ВЕСНА\" #\n";
+113 print "################################\n";
+114
+115 $menuOption = get_option('Введіть команду: ', 'ПОМИЛКА! Введіть правильну команду', 'show_menu', $menuOptions);
+116
+117 while (true) {
+118     if ($menuOption == "0") {
+119         exit;
+120     }
+121     elseif ($menuOption == "1") {
+122         do {
+123             $product = get_option('Виберіть товар: ', 'ПОМИЛКА! ВКАЗАНО НЕПРАВИЛЬНИЙ НОМЕР ТОВАРУ', 'show_goods', $productsOptions);
+124             if ($product == 0) {
+125                 continue;
+126             }
+127             print "Вибрано: {$productsOptions[$product][0]}\n";
+128             $quantity = get_quantity();
+129             update_bag($product, $quantity, $productsOptions);
+130             print_bag($bag, $productsOptions);
+131         } while ($product != 0);
+132     }
+133     else if ($menuOption == "2") {
+134         $num = 1;
+135         $toPay = 0;
+136         print "№  НАЗВА                 ЦІНА  КІЛЬКІСТЬ  ВАРТІСТЬ\n";
+137         foreach ($bag as $id => $quantity) {
+138             $title = $productsOptions[$id][0];
+139             $price = $productsOptions[$id][1];
+140             $allPrice = $price * $quantity;
+141             $titlePadding = 22 - text_length($title);
+142             $pricePadding = 6 - text_length($price);
+143             $quantityPadding = 11 - text_length($quantity);
+144             $toPay += $allPrice;
+145             print $num . str_repeat(' ', 2) . $title . str_repeat(' ', $titlePadding) . $price . str_repeat(' ', $pricePadding) . $quantity . str_repeat(' ', $quantityPadding) . $allPrice . "\n";
+146             $num++;
+147         }
+148         print "РАЗОМ ДО CПЛАТИ: $toPay\n";
+149     }
+150     elseif ($menuOption == "3") {
+151             $name = get_name();
+152             $age = get_age();
+153     }
+154     $menuOption = get_option('Введіть команду: ', 'ПОМИЛКА! Введіть правильну команду', 'show_menu', $menuOptions);
+155 }
+156
+4 ВИСНОВКИ
+У результаті виконання лабораторної роботи було створено консольний застосунок «Продовольчий магазин "Весна"» на мові php, який імітує взаємодію користувача з магазином у терміналі.
+ДОДАТОК А
+Відеозапис
+Відеозапис презентації результатів лабораторної роботи: https://www.youtube.com/watch?v=UfiyHJYLAy8
+Хронологічний опис відеозапису:
+00:00 — Вступ
+00:07 — Робота програми
+04:38 — Цікаві ділянки коду
+ДОДАТОК В
+Програмний код
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/blob/main/Lab2/smp-pzpi-23-4-fedkova-kateryna-lab2/smp-pzpi-23-4-fedkova-kateryna-lab2-code
+  1 <?php
+  2
+  3 $menuOptions = ['1' => 'Вибрати товари', '2' => 'Отримати підсумковий рахунок', '3' => 'Налаштувати свій профіль', '0' => 'Вийти з програми'];
+  4
+  5 $productsOptions = ['1' => ['Молоко пастеризоване', 12], '2' => ['Хліб чорний', 9], '3' => ['Сир білий', 21], '4' => ['Сметана 20%', 25], '5' => ['Кефір 1% ', 19], '6' => ['Вода газована', 18], '7' => ['Печиво "Весна"', 14]];
+  6
+  7 $bag = [];
+  8
+  9 function show_menu($menuOptions) {
+ 10     foreach ($menuOptions as $num => $text) {
+ 11         print $num . ' ' . $text . "\n";
+ 12     }
+ 13 }
+ 14
+ 15 function text_length($text) {
+ 16     preg_match_all('/./u', $text, $matches);
+ 17     return count($matches[0]);
+ 18 }
+ 19
+ 20 function show_goods($productsOptions) {
+ 21     print "№  НАЗВА                 ЦІНА\n";
+ 22     foreach ($productsOptions as $num => $product) {
+ 23         $title = $product[0];
+ 24         $price = $product[1];
+ 25         $padding = 22 - text_length($title);
+ 26         if ($padding < 0) {
+ 27             $padding = 0;
+ 28         }
+ 29         print $num . str_repeat(' ', 2) . $title . str_repeat(' ', $padding) . $price . "\n";
+ 30     }
+ 31     print "   -----------\n";
+ 32     print "0  ПОВЕРНУТИСЯ\n";
+ 33 }
+ 34
+ 35 function get_option($text, $errorText, $func, $options) {
+ 36     $option = -1;
+ 37     do {
+ 38             call_user_func($func, $options);
+ 39             print "$text";
+ 40             $option = trim(fgets(STDIN));
+ 41             if (!in_array($option, array_keys($options)) && $option != 0) {
+ 42                     print "$errorText\n";
+ 43             }
+ 44     } while (!in_array($option, array_keys($options)) && $option != 0);
+ 45     return $option;
+ 46 }
+ 47
+ 48 function get_name() {
+ 49     $name = '';
+ 50     do {
+ 51         print 'Ваше імʼя: ';
+ 52             $name = trim(fgets(STDIN));
+ 53     } while ($name == '' || preg_match_all('/[^a-zA-Zа-яА-ЯіїєґІЇЄҐ]/u', $name));
+ 54     return $name;
+ 55 }
+ 56
+ 57 function get_age() {
+ 58     $age = 0;
+ 59     do {
+ 60         print 'Ваш вік: ';
+ 61             $age = trim(fgets(STDIN));
+ 62     } while (preg_match('/[^0-9]/', $age) || $age < 7 || $age > 150);
+ 63     return $age;
+ 64 }
+ 65
+ 66 function get_quantity() {
+ 67     $quantity = -1;
+ 68     do {
+ 69         print 'Введіть кількість, штук: ';
+ 70         $quantity = trim(fgets(STDIN));
+ 71     } while (preg_match('/[^[1-9]]/', $quantity) || $quantity < 0 || $quantity > 99);
+ 72     return $quantity;
+ 73 }
+ 74
+ 75
+ 76 function update_bag($product, $quantity) {
+ 77     global $bag;
+ 78     if ($quantity == 0) {
+ 79         print "ВИДАЛЯЮ З КОШИКА\n";
+ 80         unset($bag[$product]);
+ 81         return;
+ 82     }
+ 83
+ 84     if (!in_array($product, array_keys($bag))) {
+ 85         $bag[$product] = $quantity;
+ 86     } else {
+ 87         $bag[$product] += $quantity;
+ 88     }
+ 89 }
+ 90
+ 91
+ 92 function print_bag($bag, $productsOptions) {
+ 93     if (count($bag) == 0) {
+ 94         print "КОШИК ПОРОЖНІЙ\n";
+ 95         return;
+ 96     }
+ 97
+ 98     print "У КОШИКУ:\n";
+ 99     print "НАЗВА                 КІЛЬКІСТЬ\n";
+100     foreach ($bag as $productId => $productCount) {
+101         $title = $productsOptions[$productId][0];
+102         $padding = 22 - text_length($title);
+103         if ($padding < 0) {
+104             $padding = 0;
+105         }
+106         print $title . str_repeat(' ', $padding) . $productCount . "\n";
+107     }
+108 }
+109
+110
+111 print "################################\n";
+112 print "# ПРОДОВОЛЬЧИЙ МАГАЗИН \"ВЕСНА\" #\n";
+113 print "################################\n";
+114
+115 $menuOption = get_option('Введіть команду: ', 'ПОМИЛКА! Введіть правильну команду', 'show_menu', $menuOptions);
+116
+117 while (true) {
+118     if ($menuOption == "0") {
+119         exit;
+120     }
+121     elseif ($menuOption == "1") {
+122         do {
+123             $product = get_option('Виберіть товар: ', 'ПОМИЛКА! ВКАЗАНО НЕПРАВИЛЬНИЙ НОМЕР ТОВАРУ', 'show_goods', $productsOptions);
+124             if ($product == 0) {
+125                 continue;
+126             }
+127             print "Вибрано: {$productsOptions[$product][0]}\n";
+128             $quantity = get_quantity();
+129             update_bag($product, $quantity, $productsOptions);
+130             print_bag($bag, $productsOptions);
+131         } while ($product != 0);
+132     }
+133     else if ($menuOption == "2") {
+134         $num = 1;
+135         $toPay = 0;
+136         print "№  НАЗВА                 ЦІНА  КІЛЬКІСТЬ  ВАРТІСТЬ\n";
+137         foreach ($bag as $id => $quantity) {
+138             $title = $productsOptions[$id][0];
+139             $price = $productsOptions[$id][1];
+140             $allPrice = $price * $quantity;
+141             $titlePadding = 22 - text_length($title);
+142             $pricePadding = 6 - text_length($price);
+143             $quantityPadding = 11 - text_length($quantity);
+144             $toPay += $allPrice;
+145             print $num . str_repeat(' ', 2) . $title . str_repeat(' ', $titlePadding) . $price . str_repeat(' ', $pricePadding) . $quantity . str_repeat(' ', $quantityPadding) . $allPrice . "\n";
+146             $num++;
+147         }
+148         print "РАЗОМ ДО CПЛАТИ: $toPay\n";
+149     }
+150     elseif ($menuOption == "3") {
+151             $name = get_name();
+152             $age = get_age();
+153     }
+154     $menuOption = get_option('Введіть команду: ', 'ПОМИЛКА! Введіть правильну команду', 'show_menu', $menuOptions);
+155 }
+156

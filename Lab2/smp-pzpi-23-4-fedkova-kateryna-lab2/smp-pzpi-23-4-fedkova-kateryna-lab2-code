@@ -1,1 +1,155 @@
+<?php
 
+$menuOptions = ['1' => 'Вибрати товари', '2' => 'Отримати підсумковий рахунок', '3' => 'Налаштувати свій профіль', '0' => 'Вийти з програми'];
+
+$productsOptions = ['1' => ['Молоко пастеризоване', 12], '2' => ['Хліб чорний', 9], '3' => ['Сир білий', 21], '4' => ['Сметана 20%', 25], '5' => ['Кефір 1% ', 19], '6' => ['Вода газована', 18], '7' => ['Печиво "Весна"', 14]];
+
+$bag = [];
+
+function show_menu($menuOptions) {
+    foreach ($menuOptions as $num => $text) {
+        print $num . ' ' . $text . "\n";
+    }
+}
+
+function text_length($text) {
+    preg_match_all('/./u', $text, $matches);
+    return count($matches[0]);
+}
+
+function show_goods($productsOptions) {
+    print "№  НАЗВА                 ЦІНА\n";
+    foreach ($productsOptions as $num => $product) {
+        $title = $product[0];
+        $price = $product[1];
+        $padding = 22 - text_length($title);
+        if ($padding < 0) {
+            $padding = 0;
+        }
+        print $num . str_repeat(' ', 2) . $title . str_repeat(' ', $padding) . $price . "\n";
+    }
+    print "   -----------\n";
+    print "0  ПОВЕРНУТИСЯ\n";
+}
+
+function get_option($text, $errorText, $func, $options) {
+	$option = -1;
+	do {
+		call_user_func($func, $options);
+		print "$text";
+		$option = trim(fgets(STDIN));
+		if (!in_array($option, array_keys($options)) && $option != 0) {
+			print "$errorText\n";
+		}
+	} while (!in_array($option, array_keys($options)) && $option != 0);
+	return $option;
+}
+
+function get_name() {
+    $name = '';
+    do {
+	    print 'Ваше імʼя: ';
+		$name = trim(fgets(STDIN));
+	} while ($name == '' || preg_match_all('/[^a-zA-Zа-яА-ЯіїєґІЇЄҐ]/u', $name));
+	return $name;
+}
+
+function get_age() {
+    $age = 0;
+    do {
+        print 'Ваш вік: ';
+		$age = trim(fgets(STDIN));
+	} while (preg_match('/[^0-9]/', $age) || $age < 7 || $age > 150);
+	return $age;
+}
+
+function get_quantity() {
+    $quantity = -1;
+    do {
+        print 'Введіть кількість, штук: ';
+	    $quantity = trim(fgets(STDIN));
+	} while (preg_match('/[^[1-9]]/', $quantity) || $quantity < 0 || $quantity > 99);
+	return $quantity;
+}
+
+
+function update_bag($product, $quantity) {
+    global $bag;
+    if ($quantity == 0) {
+        print "ВИДАЛЯЮ З КОШИКА\n";
+        unset($bag[$product]);
+        return;
+    }
+
+    if (!in_array($product, array_keys($bag))) {
+        $bag[$product] = $quantity;
+    } else {
+        $bag[$product] += $quantity;
+    }
+}
+
+
+function print_bag($bag, $productsOptions) {        
+    if (count($bag) == 0) {
+        print "КОШИК ПОРОЖНІЙ\n";
+        return;
+    } 
+
+    print "У КОШИКУ:\n";
+    print "НАЗВА                 КІЛЬКІСТЬ\n";
+    foreach ($bag as $productId => $productCount) { 
+        $title = $productsOptions[$productId][0];
+        $padding = 22 - text_length($title);
+        if ($padding < 0) {
+            $padding = 0;
+        }            
+        print $title . str_repeat(' ', $padding) . $productCount . "\n";
+    }
+}
+          
+
+print "################################\n";
+print "# ПРОДОВОЛЬЧИЙ МАГАЗИН \"ВЕСНА\" #\n";
+print "################################\n";
+
+$menuOption = get_option('Введіть команду: ', 'ПОМИЛКА! Введіть правильну команду', 'show_menu', $menuOptions);
+
+while (true) {
+    if ($menuOption == "0") {
+        exit;
+    } 
+    elseif ($menuOption == "1") {
+        do {
+            $product = get_option('Виберіть товар: ', 'ПОМИЛКА! ВКАЗАНО НЕПРАВИЛЬНИЙ НОМЕР ТОВАРУ', 'show_goods', $productsOptions);
+            if ($product == 0) {
+                continue;
+            }
+            print "Вибрано: {$productsOptions[$product][0]}\n";
+            $quantity = get_quantity();
+            update_bag($product, $quantity);
+            print_bag($bag, $productsOptions);
+        } while ($product != 0);
+    } 
+    else if ($menuOption == "2") {
+        $num = 1;
+        $toPay = 0;
+        print "№  НАЗВА                 ЦІНА  КІЛЬКІСТЬ  ВАРТІСТЬ\n";
+        foreach ($bag as $id => $quantity) {
+            $title = $productsOptions[$id][0];
+            $price = $productsOptions[$id][1];
+            $allPrice = $price * $quantity;
+            $titlePadding = 22 - text_length($title);
+            $pricePadding = 6 - text_length($price);
+            $quantityPadding = 11 - text_length($quantity);
+            $toPay += $allPrice;
+            print $num . str_repeat(' ', 2) . $title . str_repeat(' ', $titlePadding) . $price . str_repeat(' ', $pricePadding) . $quantity . str_repeat(' ', $quantityPadding) . $allPrice . "\n";
+            $num++;
+        }
+        print "РАЗОМ ДО CПЛАТИ: $toPay\n";
+    } 
+    elseif ($menuOption == "3") {
+    	$name = get_name();
+    	$age = get_age();
+    }
+    $menuOption = get_option('Введіть команду: ', 'ПОМИЛКА! Введіть правильну команду', 'show_menu', $menuOptions);
+}
