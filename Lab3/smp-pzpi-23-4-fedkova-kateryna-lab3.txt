@@ -1,1 +1,653 @@
+Харківський національний університет радіоелектроніки
+Факультет комп’ютерних наук
+Катедра програмної інженерії
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+ЗВІТ
+з лабораторної роботи № 3 
+з дисципліни «Скриптові мови програмування»
+на тему: «Продовольчий магазин "Весна"»
+
+
+
+
+
+
+
+
+Виконала
+ст. гр. ПЗПІ-23-4
+Федькова Катерина
+Перевірив
+ст. викладач катедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+Харків 2025
+1 ІСТОРІЯ ЗМІН
+№
+	Дата
+	Версія звіту
+	Опис змін та виправлень
+	1
+	18.05.2025
+	0.1
+	Створено звіт
+	
+
+2 ЗАВДАННЯ
+Метою даної роботи є створення робочого сайту з інтернет магазином «Продовольчий магазин "Весна"». Він має складатися зі  сторінки товарів та сторінки «Кошик». Кожна сторінка має складатися з «шапки» сторінки, тіла сторінки та «підвалу» сторінки. На сторінці товарів необхідно відобразити список доступних для покупки найменувань з можливістю вибрати кількість одиниць товарів і кнопкою «купити». Під час натискання на кнопку «купити», має відправлятися запит (відправка форми, методом POST) на сервер, де дані зберігаються в сесію. На сторінці «Кошик» необхідно відобразити список обраних користувачем товарів (які були збережені у сесію). Якщо ви ще не обрали жодного товару, то має бути відображений напис «Перейти до покупок» (посилання).
+3 ОПИС ВИКОНАНОЇ РОБОТИ
+Весь код завдання знаходиться у додатку В. Створимо index.php, яка є головною сторінкою сайту, яка відображає заголовок магазину та підключає загальні компоненти: includes/header.php - шапка сайту з навігацією та includes/footer.php - футер з посиланнями.
+
+
+  1 <!DOCTYPE html>
+  2 <html lang="en">
+  3 <head>
+  4     <meta charset="UTF-8">
+  5     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  6     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  7     <title>Весна</title>
+  8     <link rel="stylesheet" href="css/styles.css">
+  9     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+ 10     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+ 11 </head>
+ 12 <body>
+ 13
+ 14     <?php  include "includes/header.php" ?>
+ 15
+ 16     <main>
+ 17         <h1 class="title-text">ПРОДОВОЛЬЧИЙ МАГАЗИН "ВЕСНА"</h1>
+ 18     </main>
+ 19
+ 20     <?php  include "includes/footer.php" ?>
+ 21
+ 22 </body>
+ 23 </html>
+
+
+Створимо сторінку add_to_bag.php, яка обробляє дані з форми додавання товарів до кошика. Вона запускає сесію для збереження даних кошика та перевіряє, чи передано масив $_POST['bag']. Для кожного товару перевіряє кількість та додає товар до кошика. Зберігає кошик у сесії та перенаправляє на сторінку кошика.
+
+
+  1 <?php
+  2
+  3 session_start();
+  4 $bag = [];
+  5
+  6 if (isset($_POST['bag'])) {
+  7     foreach ($_POST['bag'] as $id => $data) {
+  8         $title = $data['title'];
+  9         $quantity = $data['quantity'];
+ 10         $price = $data['price'];
+ 11
+ 12         if (!is_numeric($quantity) || $quantity < 0 || $quantity > 99) {
+ 13             $_SESSION['form_data'] = $_POST['bag'];
+ 14             $_SESSION['form_error'] = 'Перевірте будь ласка введені дані';
+ 15             header('Location: pages/products.php');
+ 16             exit;
+ 17         }
+ 18
+ 19         if ($quantity > 0) {
+ 20             $bag[$id] = [
+ 21                 'title' => $title,
+ 22                 'quantity' => $quantity,
+ 23                 'price' => $price
+ 24             ];
+ 25         }
+ 26     }
+ 27
+ 28     $_SESSION['bag'] = $bag;
+ 29     unset($_SESSION['form_data'], $_SESSION['form_error']);
+ 30     header('Location: pages/basket.php');
+ 31     exit;
+ 32 }
+
+
+Створимо файл db_connection.php, який підключається до бази даних SQLite та повертає всі записи з таблиці products у вигляді масиву.
+
+
+  1 <?php
+  2
+  3 function get_products() {
+  4     $dbPath = __DIR__ . '/shop.db';
+  5     $pdo = new PDO('sqlite:' . $dbPath);
+  6     $statement = $pdo->query("SELECT * FROM products");
+  7     $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+  8     return $rows;
+  9 }
+ 10
+
+
+Створимо файл basket.php, який відображення вміст кошика. Він запускає сесію та ініціалізує змінну totalAmount, обробляє POST-запити для видалення окремого товару з кошика та очищення кошика. Якщо кошик порожній — відображає посилання на сторінку товарів. Якщо в кошику є товари — відображає таблицю з інформацією про товари.
+
+
+  1 <?php
+  2
+  3 session_start();
+  4 $totalAmount = 0;
+  5
+  6 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['id'])) {
+  7   $id = $_POST['id'];
+  8   unset($_SESSION['bag'][$id]);
+  9 }
+ 10
+ 11 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cancelOrPay'])) {
+ 12   $_SESSION['bag'] = [];
+ 13 }
+ 14
+ 15 ?>
+ 16
+ 17 <!DOCTYPE html>
+ 18 <html lang="en">
+ 19 <head>
+ 20     <meta charset="UTF-8">
+ 21     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ 22     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 23     <title>Весна</title>
+ 24     <link rel="stylesheet" href="/css/styles.css">
+ 25     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+ 26     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+ 27     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+ 28 </head>
+ 29 <body>
+ 30
+ 31     <?php  include "../includes/header.php" ?>
+ 32
+ 33     <main>
+ 34          <?php if (empty($_SESSION['bag'])): ?>
+ 35             <div class="d-flex justify-content-center align-items-center" >
+ 36               <a class="title-text" href="products.php">Перейти до покупок</a>
+ 37             </div>
+ 38
+ 39           <?php else: ?>
+ 40             <table class="table table-bordered table-striped align-middle">
+ 41               <thead>
+ 42                 <tr>
+ 43                     <th scope="col">id</th>
+ 44                     <th scope="col">name</th>
+ 45                     <th scope="col">price</th>
+ 46                     <th scope="col">count</th>
+ 47                     <th scope="col">sum</th>
+ 48                     <th scope="col"></th>
+ 49                 </tr>
+ 50               </thead>
+ 51               <tbody>
+ 52                 <?php foreach ($_SESSION['bag'] as $id => $data):
+ 53                   $title = $data['title'];
+ 54                   $quantity = $data['quantity'];
+ 55                   $price = $data['price'];
+ 56                   $totalAmount += $quantity * $price;
+ 57                 ?>
+ 58                   <tr>
+ 59                     <td><?php echo $id; ?></td>
+ 60                     <td><?php echo $title; ?></td>
+ 61                     <td><?php echo $price; ?></td>
+ 62                     <td><?php echo $quantity; ?></td>
+ 63                     <td><?php echo $price * $quantity; ?></td>
+ 64                     <td>
+ 65                       <form method="POST" action="">
+ 66                         <input type="hidden" name="id" value="<?php echo $id; ?>">
+ 67                         <button type="submit" class="btn btn-sm btn-danger">
+ 68                           <i class="bi bi-trash"></i>
+ 69                         </button>
+ 70                       </form>
+ 71                     </td>
+ 72                   </tr>
+ 73           <?php endforeach; ?>
+ 74           <tr>
+ 75             <td>Total</td>
+ 76             <td></td>
+ 77             <td></td>
+ 78             <td></td>
+ 79             <td><?php echo $totalAmount; ?></td>
+ 80           </tr>
+ 81         </tbody>
+ 82       </table>
+ 83       <form method="POST" action="">
+ 84         <input type="hidden" name="cancelOrPay">
+ 85         <div class="mt-3 d-flex justify-content-center gap-2">
+ 86           <button type="submit" class="btn btn-primary">cancel</button>
+ 87           <button type="submit" class="btn btn-primary">pay</button>
+ 88         </div>
+ 89       </form>
+ 90     <?php endif; ?>
+ 91
+ 92     </main>
+ 93
+ 94     <?php  include "../includes/footer.php" ?>
+ 95
+ 96 </body>
+ 97 </html>
+
+
+Створимо файл products.php, який відображає список товарів. Він запускає сесію та отримує дані форми та повідомлення про помилки з сесії.Відображає повідомлення про помилку, якщо є.Виводить таблицю з товарами.
+
+
+  1 <?php
+  2
+  3 session_start();
+  4 require_once __DIR__ . '/../db/db_connection.php';
+  5
+  6 $formData = $_SESSION['form_data'] ?? [];
+  7 $formError = $_SESSION['form_error'] ?? '';
+  8 unset($_SESSION['form_data'], $_SESSION['form_error']);
+  9 ?>
+ 10
+ 11 <!DOCTYPE html>
+ 12 <html lang="en">
+ 13 <head>
+ 14     <meta charset="UTF-8">
+ 15     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ 16     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 17     <title>Весна</title>
+ 18     <link rel="stylesheet" href="/css/styles.css">
+ 19     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+ 20     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+ 21 </head>
+ 22 <body>
+ 23
+ 24     <?php include "../includes/header.php" ?>
+ 25
+ 26     <main>
+ 27
+ 28       <?php $products= get_products() ?>
+ 29
+ 30         <?php if ($formError): ?>
+ 31           <div class="alert alert-danger text-center"><?php echo $formError; ?></div>
+ 32         <?php endif; ?>
+ 33
+ 34         <form class="product-form" method="POST" action="/add_to_bag.php">
+ 35           <table class="table table-bordered table-striped align-middle">
+ 36           <tbody>
+ 37             <?php foreach ($products as $product):
+ 38               $id = $product['id'];
+ 39               $oldQuantity = $formData[$id]['quantity'] ?? 0;
+ 40             ?>
+ 41               <tr>
+ 42                 <td><?php echo $id; ?></td>
+ 43                 <td><?php echo $product['title']; ?></td>
+ 44                 <td>
+ 45                   <input type="hidden" name="bag[<?php echo $id; ?>][title]" value="<?php echo $product['title']; ?>">
+ 46                   <input
+ 47                     name="bag[<?php echo $id; ?>][quantity]"
+ 48                     type="number"
+ 49                     step="1"
+ 50                     value="<?php echo $oldQuantity; ?>"
+ 51                     class="form-control form-control-sm"
+ 52                   >
+ 53                   <input type="hidden" name="bag[<?php echo $id; ?>][price]" value="<?php echo $product['price']; ?>">
+ 54                 </td>
+ 55                 <td><?php echo $product['price']; ?> грн</td>
+ 56               </tr>
+ 57             <?php endforeach; ?>
+ 58           </tbody>
+ 59           </table>
+ 60
+ 61           <div class="mt-3 d-flex justify-content-center">
+ 62             <button type="submit" class="btn btn-primary">Send</button>
+ 63           </div>
+ 64         </form>
+ 65     </main>
+ 66
+ 67     <?php  include "../includes/footer.php" ?>
+ 68
+ 69 </body>
+ 70 </html>
+4 ВИСНОВКИ
+У результаті виконання лабораторної роботи було створено робочий сайту з інтернет магазином «Продовольчий магазин "Весна"» на мові php.
+ДОДАТОК А
+Відеозапис
+Відеозапис презентації результатів лабораторної роботи: https://www.youtube.com/watch?v=gIaYbzNdBE8
+Хронологічний опис відеозапису:
+00:00 — Вступ
+00:07 — Як працює програма
+04:38 — Цікаві ділянки коду
+ДОДАТОК В
+Програмний код
+В.1 index.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab3/smp-pzpi-23-4-fedkova-kateryna-lab3/index.php
+
+
+  1 <!DOCTYPE html>
+  2 <html lang="en">
+  3 <head>
+  4     <meta charset="UTF-8">
+  5     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  6     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  7     <title>Весна</title>
+  8     <link rel="stylesheet" href="css/styles.css">
+  9     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+ 10     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+ 11 </head>
+ 12 <body>
+ 13
+ 14     <?php  include "includes/header.php" ?>
+ 15
+ 16     <main>
+ 17         <h1 class="title-text">ПРОДОВОЛЬЧИЙ МАГАЗИН "ВЕСНА"</h1>
+ 18     </main>
+ 19
+ 20     <?php  include "includes/footer.php" ?>
+ 21
+ 22 </body>
+ 23 </html>
+
+
+В.2 add_to_bag.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab3/smp-pzpi-23-4-fedkova-kateryna-lab3/add_to_bag.php
+
+
+  1 <?php
+  2
+  3 session_start();
+  4 $bag = [];
+  5
+  6 if (isset($_POST['bag'])) {
+  7     foreach ($_POST['bag'] as $id => $data) {
+  8         $title = $data['title'];
+  9         $quantity = $data['quantity'];
+ 10         $price = $data['price'];
+ 11
+ 12         if (!is_numeric($quantity) || $quantity < 0 || $quantity > 99) {
+ 13             $_SESSION['form_data'] = $_POST['bag'];
+ 14             $_SESSION['form_error'] = 'Перевірте будь ласка введені дані';
+ 15             header('Location: pages/products.php');
+ 16             exit;
+ 17         }
+ 18
+ 19         if ($quantity > 0) {
+ 20             $bag[$id] = [
+ 21                 'title' => $title,
+ 22                 'quantity' => $quantity,
+ 23                 'price' => $price
+ 24             ];
+ 25         }
+ 26     }
+ 27
+ 28     $_SESSION['bag'] = $bag;
+ 29     unset($_SESSION['form_data'], $_SESSION['form_error']);
+ 30     header('Location: pages/basket.php');
+ 31     exit;
+ 32 }
+
+
+В.3 styles.css
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab3/smp-pzpi-23-4-fedkova-kateryna-lab3/css/styles.css
+
+
+  1 * {
+  2   margin: 0;
+  3   padding: 0;
+  4   box-sizing: border-box;
+  5 }
+  6
+  7 .title-text {
+  8   padding-top: 40px;
+  9   text-align: center;
+ 10 }
+ 11
+ 12 footer {
+ 13   border: 1px solid black;
+ 14   position: fixed;
+ 15   bottom: 0;
+ 16   width: 100%;
+ 17 }
+ 18
+ 19 .product-form {
+ 20   margin-top: 40px;
+ 21 }
+
+
+В.4 db_connection.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab3/smp-pzpi-23-4-fedkova-kateryna-lab3/db/db_connection.php
+
+
+  1 <?php
+  2
+  3 function get_products() {
+  4     $dbPath = __DIR__ . '/shop.db';
+  5     $pdo = new PDO('sqlite:' . $dbPath);
+  6     $statement = $pdo->query("SELECT * FROM products");
+  7     $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+  8     return $rows;
+  9 }
+ 10
+
+
+В.5 footer.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab3/smp-pzpi-23-4-fedkova-kateryna-lab3/includes/footer.php
+
+
+ 1 <footer class="d-flex justify-content-between align-items-center border-top py-3">
+  2   <div class="container">
+  3     <nav class="d-flex justify-content-center">
+  4       <ul class="nav">
+  5         <li class="nav-item">
+  6           <a class="nav-link text-dark" href="/index.php">Home</a>
+  7         </li>
+  8         <li class="nav-item">
+  9           <a class="nav-link text-dark" href="/pages/products.php">Products</a>
+ 10         </li>
+ 11         <li class="nav-item">
+ 12           <a class="nav-link text-dark" href="/pages/basket.php">Cart</a>
+ 13         </li>
+ 14         <li class="nav-item">
+ 15           <a class="nav-link text-dark" href="#">About Us</a>
+ 16         </li>
+ 17       </ul>
+ 18     </nav>
+ 19   </div>
+ 20 </footer>
+ 21
+
+
+В.6 header.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab3/smp-pzpi-23-4-fedkova-kateryna-lab3/includes/header.php
+
+
+ 1 <header class="d-flex justify-content-between align-items-center p-3 border-bottom border-dark">
+  2   <a href="/index.php" class="text-decoration-none text-dark">
+  3     <i class="fas fa-home me-1"></i> Home
+  4   </a>
+  5
+  6   <a href="/pages/products.php" class="text-decoration-none text-dark">
+  7     <i class="fas fa-list me-1"></i> Products
+  8   </a>
+  9
+ 10   <a href="/pages/basket.php" class="text-decoration-none text-dark">
+ 11     <i class="fas fa-shopping-cart me-1"></i> Cart
+ 12   </a>
+ 13 </header>
+
+
+В.7 basket.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab3/smp-pzpi-23-4-fedkova-kateryna-lab3/pages/basket.php
+
+
+  1 <?php
+  2
+  3 session_start();
+  4 $totalAmount = 0;
+  5
+  6 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['id'])) {
+  7   $id = $_POST['id'];
+  8   unset($_SESSION['bag'][$id]);
+  9 }
+ 10
+ 11 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cancelOrPay'])) {
+ 12   $_SESSION['bag'] = [];
+ 13 }
+ 14
+ 15 ?>
+ 16
+ 17 <!DOCTYPE html>
+ 18 <html lang="en">
+ 19 <head>
+ 20     <meta charset="UTF-8">
+ 21     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ 22     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 23     <title>Весна</title>
+ 24     <link rel="stylesheet" href="/css/styles.css">
+ 25     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+ 26     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+ 27     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+ 28 </head>
+ 29 <body>
+ 30
+ 31     <?php  include "../includes/header.php" ?>
+ 32
+ 33     <main>
+ 34          <?php if (empty($_SESSION['bag'])): ?>
+ 35             <div class="d-flex justify-content-center align-items-center" >
+ 36               <a class="title-text" href="products.php">Перейти до покупок</a>
+ 37             </div>
+ 38
+ 39           <?php else: ?>
+ 40             <table class="table table-bordered table-striped align-middle">
+ 41               <thead>
+ 42                 <tr>
+ 43                     <th scope="col">id</th>
+ 44                     <th scope="col">name</th>
+ 45                     <th scope="col">price</th>
+ 46                     <th scope="col">count</th>
+ 47                     <th scope="col">sum</th>
+ 48                     <th scope="col"></th>
+ 49                 </tr>
+ 50               </thead>
+ 51               <tbody>
+ 52                 <?php foreach ($_SESSION['bag'] as $id => $data):
+ 53                   $title = $data['title'];
+ 54                   $quantity = $data['quantity'];
+ 55                   $price = $data['price'];
+ 56                   $totalAmount += $quantity * $price;
+ 57                 ?>
+ 58                   <tr>
+ 59                     <td><?php echo $id; ?></td>
+ 60                     <td><?php echo $title; ?></td>
+ 61                     <td><?php echo $price; ?></td>
+ 62                     <td><?php echo $quantity; ?></td>
+ 63                     <td><?php echo $price * $quantity; ?></td>
+ 64                     <td>
+ 65                       <form method="POST" action="">
+ 66                         <input type="hidden" name="id" value="<?php echo $id; ?>">
+ 67                         <button type="submit" class="btn btn-sm btn-danger">
+ 68                           <i class="bi bi-trash"></i>
+ 69                         </button>
+ 70                       </form>
+ 71                     </td>
+ 72                   </tr>
+ 73           <?php endforeach; ?>
+ 74           <tr>
+ 75             <td>Total</td>
+ 76             <td></td>
+ 77             <td></td>
+ 78             <td></td>
+ 79             <td><?php echo $totalAmount; ?></td>
+ 80           </tr>
+ 81         </tbody>
+ 82       </table>
+ 83       <form method="POST" action="">
+ 84         <input type="hidden" name="cancelOrPay">
+ 85         <div class="mt-3 d-flex justify-content-center gap-2">
+ 86           <button type="submit" class="btn btn-primary">cancel</button>
+ 87           <button type="submit" class="btn btn-primary">pay</button>
+ 88         </div>
+ 89       </form>
+ 90     <?php endif; ?>
+ 91
+ 92     </main>
+ 93
+ 94     <?php  include "../includes/footer.php" ?>
+ 95
+ 96 </body>
+ 97 </html>
+
+
+В.8 products.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab3/smp-pzpi-23-4-fedkova-kateryna-lab3/pages/products.php
+
+
+  1 <?php
+  2
+  3 session_start();
+  4 require_once __DIR__ . '/../db/db_connection.php';
+  5
+  6 $formData = $_SESSION['form_data'] ?? [];
+  7 $formError = $_SESSION['form_error'] ?? '';
+  8 unset($_SESSION['form_data'], $_SESSION['form_error']);
+  9 ?>
+ 10
+ 11 <!DOCTYPE html>
+ 12 <html lang="en">
+ 13 <head>
+ 14     <meta charset="UTF-8">
+ 15     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ 16     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 17     <title>Весна</title>
+ 18     <link rel="stylesheet" href="/css/styles.css">
+ 19     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+ 20     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+ 21 </head>
+ 22 <body>
+ 23
+ 24     <?php include "../includes/header.php" ?>
+ 25
+ 26     <main>
+ 27
+ 28       <?php $products= get_products() ?>
+ 29
+ 30         <?php if ($formError): ?>
+ 31           <div class="alert alert-danger text-center"><?php echo $formError; ?></div>
+ 32         <?php endif; ?>
+ 33
+ 34         <form class="product-form" method="POST" action="/add_to_bag.php">
+ 35           <table class="table table-bordered table-striped align-middle">
+ 36           <tbody>
+ 37             <?php foreach ($products as $product):
+ 38               $id = $product['id'];
+ 39               $oldQuantity = $formData[$id]['quantity'] ?? 0;
+ 40             ?>
+ 41               <tr>
+ 42                 <td><?php echo $id; ?></td>
+ 43                 <td><?php echo $product['title']; ?></td>
+ 44                 <td>
+ 45                   <input type="hidden" name="bag[<?php echo $id; ?>][title]" value="<?php echo $product['title']; ?>">
+ 46                   <input
+ 47                     name="bag[<?php echo $id; ?>][quantity]"
+ 48                     type="number"
+ 49                     step="1"
+ 50                     value="<?php echo $oldQuantity; ?>"
+ 51                     class="form-control form-control-sm"
+ 52                   >
+ 53                   <input type="hidden" name="bag[<?php echo $id; ?>][price]" value="<?php echo $product['price']; ?>">
+ 54                 </td>
+ 55                 <td><?php echo $product['price']; ?> грн</td>
+ 56               </tr>
+ 57             <?php endforeach; ?>
+ 58           </tbody>
+ 59           </table>
+ 60
+ 61           <div class="mt-3 d-flex justify-content-center">
+ 62             <button type="submit" class="btn btn-primary">Send</button>
+ 63           </div>
+ 64         </form>
+ 65     </main>
+ 66
+ 67     <?php  include "../includes/footer.php" ?>
+ 68
+ 69 </body>
+ 70 </html>
