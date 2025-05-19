@@ -1,1 +1,735 @@
+Харківський національний університет радіоелектроніки
+Факультет комп’ютерних наук
+Катедра програмної інженерії
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+ЗВІТ
+з лабораторної роботи № 4
+з дисципліни «Скриптові мови програмування»
+на тему: «Продовольчий магазин "Весна"»
+
+
+
+
+
+
+
+
+Виконала
+ст. гр. ПЗПІ-23-4
+Федькова Катерина
+Перевірив
+ст. викладач катедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+Харків 2025
+1 ІСТОРІЯ ЗМІН
+№
+	Дата
+	Версія звіту
+	Опис змін та виправлень
+	1
+	19.05.2025
+	0.1
+	Створено звіт
+	
+
+2 ЗАВДАННЯ
+Метою даної роботи є створення робочого сайту з інтернет магазином «Продовольчий магазин "Весна"». На цьому сайті не має бути дублювання шапки і підвалу сайту. Крім цього, потрібно додати сторінку логіна та профілю з можливістю завантажити фото. Не залогіненим користувачам потрібно обмежити доступ до сайту.
+3 ОПИС ВИКОНАНОЇ РОБОТИ
+Весь код завдання знаходиться у додатку В. Створимо файл login.php, який містить форму для логінізації та логіку запису в сесію. Файл отримує введені користувачем логін і пароль та порівнює введені дані з тими, що в credential.php. Якщо збіг - зберігає сесію та перенаправляє на /products. Якщо ні - зберігає повідомлення про помилку в сесії.
+
+
+  1 <?php
+  2
+  3 require 'credential.php';
+  4
+  5 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['username']) && isset($_POST['password'])) {
+  6   $formUsername = $_POST['username'];
+  7   $formPassword = $_POST['password'];
+  8   if (isset($credentials['username'], $credentials['password'])) {
+  9     if ($credentials['username'] == $formUsername && $credentials['password'] == $formPassword) {
+ 10       $_SESSION['username'] = $formUsername;
+ 11               $_SESSION['authorized_at'] = date("Y-m-d H:i:s");
+ 12       header('Location: /products');
+ 13       exit;
+ 14     }
+ 15     else {
+ 16       $_SESSION['form_error'] = 'Відбулась помилка';
+ 17     }
+ 18   }
+ 19   else {
+ 20     $_SESSION['form_error'] = 'Відбулась помилка';
+ 21   }
+ 22 }
+ 23
+ 24 $formError = $_SESSION['form_error'] ?? '';
+ 25 unset($_SESSION['form_error']);
+ 26
+ 27 ?>
+ 28
+ 29 <!DOCTYPE html>
+ 30 <html lang="en">
+ 31 <head>
+ 32     <meta charset="UTF-8">
+ 33     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ 34     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 35     <title>Весна</title>
+ 36     <link rel="stylesheet" href="/css/styles.css">
+ 37     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+ 38     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+ 39     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+ 40 </head>
+ 41 <body>
+ 42
+ 43     <main>
+ 44
+ 45       <?php if ($formError): ?>
+ 46         <div class="alert alert-danger text-center"><?php echo $formError; ?></div>
+ 47       <?php endif; ?>
+ 48
+ 49
+ 50       <form method="POST" action="">
+ 51       <div class="container d-flex justify-content-center align-items-center mt-5">
+ 52         <div class="card shadow p-4" style="width: 100%; max-width: 400px;">
+ 53           <h2 class="text-center mb-4">Вхід до системи</h2>
+ 54           <form method="post" action="login_handler.php">
+ 55             <div class="mb-3">
+ 56               <input type="text" placeholder="User Name" class="form-control" name="username" required>
+ 57             </div>
+ 58             <div class="mb-3">
+ 59               <input type="password" placeholder="Password" class="form-control" name="password" required>
+ 60             </div>
+ 61             <button type="submit" class="btn btn-primary w-100">Login</button>
+ 62           </form>
+ 63         </div>
+ 64       </div>
+ 65       </form>
+ 66
+ 67     </main>
+ 68
+ 69 </body>
+ 70 </html>
+
+
+Створимо файл profile_edit.php, що дозволяє редагувати профіль користувача, а саме: ім’я, прізвище, дату народження, опис і фото.
+
+
+  1 <?php
+  2
+  3 $errors = [];
+  4
+  5 $userProfile = require 'profile.php';
+  6
+  7 $name = $userProfile['name'] ?? '';
+  8 $surname = $userProfile['surname'] ?? '';
+  9 $date_of_birth = $userProfile['date_of_birth'] ?? '';
+ 10 $description = $userProfile['description'] ?? '';
+ 11 $photo = $userProfile['photo'] ?? '';
+ 12
+ 13
+ 14 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+ 15     $name = trim($_POST['name'] ?? '');
+ 16     $surname = trim($_POST['surname'] ?? '');
+ 17     $date_of_birth = $_POST['date_of_birth'] ?? '';
+ 18     $description = trim($_POST['description'] ?? '');
+ 19
+ 20     if ($name === '' || $surname === '' || $date_of_birth === '' || $description === '') {
+ 21         $errors[] = "Fields can't be empty";
+ 22     }
+ 23     if (strlen($name) < 2) {
+ 24         $errors[] = "Довижина імені має бути більше 1";
+ 25     }
+ 26     if (strlen($surname) < 2) {
+ 27         $errors[] = "Довижина імені має бути більше 1";
+ 28     }
+ 29
+ 30     $birthDateTime = DateTime::createFromFormat('Y-m-d', $date_of_birth);
+ 31     if (!$birthDateTime) {
+ 32         $errors[] = "Неправильний формат дати";
+ 33     } else {
+ 34         $age = (new DateTime())->diff($birthDateTime)->y;
+ 35         if ($age < 16) {
+ 36             $errors[] = "Користувач не можу бути молодше 16";
+ 37         }
+ 38     }
+ 39
+ 40     if (strlen($description) < 50) {
+ 41         $errors[] = "Опис має містити хоча б 50 символів";
+ 42     }
+ 43
+ 44     if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK && $photo == '') {
+ 45         $errors[] = "Фото не завантажено";
+ 46     }
+ 47     if ($photo == '') {
+ 48         $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+ 49         $fileType = mime_content_type($_FILES['file']['tmp_name']);
+ 50
+ 51         if (!in_array($fileType, $allowedTypes)) {
+ 52             $errors[] = "Тип файлу не підтримується";
+ 53         } else {
+ 54             $uploadDir = './assets/';
+ 55             $fileName = uniqid('photo_') . '.' . path_info($_FILES['file']['name'], PATHINFO_EXTENSION);
+ 56             $filePath = $uploadDir . $fileName;
+ 57             if (!move_uploaded_file($_FILES['file']['tmp_name'], $filePath)) {
+ 58               $errors[] = "Помилка при збережені файлу";
+ 59             }
+ 60             $fileName =  'assets/' . $fileName;
+ 61         }
+ 62     }
+ 63
+ 64     elseif ($photo != '') {
+ 65       $fileName = $photo;
+ 66     }
+ 67
+ 68     if (empty($errors)) {
+ 69         $profileData = [
+ 70             'name' => $name,
+ 71             'surname' => $surname,
+ 72             'date_of_birth' => $date_of_birth,
+ 73             'description' => $description,
+ 74             'photo' => $fileName,
+ 75         ];
+ 76
+ 77         $phpCode = "<?php\nreturn " . var_export($profileData, true) . ";\n";
+ 78         file_put_contents('./profile.php', $phpCode);
+ 79         $userProfile = require 'profile.php';
+ 80         $name = $userProfile['name'] ?? '';
+ 81         $surname = $userProfile['surname'] ?? '';
+ 82         $date_of_birth = $userProfile['date_of_birth'] ?? '';
+ 83         $description = $userProfile['description'] ?? '';
+ 84         $photo = $userProfile['photo'] ?? '';
+ 85     }
+ 86 }
+ 87
+ 88 ?>
+ 89
+ 90 <!DOCTYPE html>
+ 91 <html lang="en">
+ 92 <head>
+ 93     <meta charset="UTF-8">
+ 94     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ 95     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 96     <title>Весна</title>
+ 97     <link rel="stylesheet" href="/css/styles.css">
+ 98     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+ 99     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+100     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+101   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+102
+103 </head>
+104 <body>
+105
+106     <main>
+107
+108     <?php if (!empty($errors)): ?>
+109       <div class="alert alert-danger alert-dismissible fade show" role="alert">
+110         <?php foreach ($errors as $error): ?>
+111           <div><?php echo htmlspecialchars($error); ?></div>
+112         <?php endforeach; ?>
+113         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+114       </div>
+115     <?php endif; ?>
+116
+117
+118
+119     <form method="POST" action="" enctype="multipart/form-data">
+120       <div class="container mt-5">
+121         <div class="row">
+122           <div class="col-md-4 d-flex flex-column align-items-center">
+123             <?php if (!empty($photo)) : ?>
+124               <div style="width: 250px; height: 250px; margin-bottom: 0;">
+125                 <img src="<?php echo $photo; ?>" alt="User Photo" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;">
+126               </div>
+127             <?php else : ?>
+128               <div class="border p-3 d-flex justify-content-center align-items-center" style="width: 250px; height: 250px; margin-bottom: 0;">
+129                 <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="currentColor" class="bi bi-image" viewBox="0 0 16 16">
+130                   <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+131                   <path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2h-13zm13 1a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h13z"/>
+132                 </svg>
+133               </div>
+134             <?php endif; ?>
+135
+136             <div class="file-upload-wrapper">
+137               <label class="custom-file-upload">
+138                 Upload
+139                 <input name="file" type="file" />
+140               </label>
+141             </div>
+142           </div>
+143
+144           <div class="col-md-8">
+145             <div class="row g-3">
+146               <div class="col-md-4">
+147                 <label for="name" class="form-label">Name</label>
+148                 <input type="text" name="name" class="form-control" value="<?php echo $name; ?>">
+149               </div>
+150               <div class="col-md-4">
+151                 <label for="surname" class="form-label">Surname</label>
+152                 <input type="text" name="surname" class="form-control" value="<?php echo $surname; ?>">
+153               </div>
+154               <div class="col-md-4">
+155                 <label for="birthdate" class="form-label">Date of birth</label>
+156                 <input type="date" name="date_of_birth" class="form-control" value="<?php echo $date_of_birth; ?>">
+157               </div>
+158             </div>
+159
+160             <div class="form-group mt-4">
+161               <label for="description" class="form-label">Brief description</label>
+162               <textarea class="form-control" name="description" rows="5"><?php echo $description; ?></textarea>
+163             </div>
+164           </div>
+165         </div>
+166
+167         <div class="d-flex justify-content-end mt-3">
+168           <button type="submit" class="btn btn-primary ms-2">Save</button>
+169         </div>
+170       </div>
+171     </form>
+172
+173     </main>
+174
+175 </body>
+176 </html>
+
+
+Створимо файл credential.php, в якому зберігаються ім'я та пароль користувача.
+
+
+  1 <?php
+  2
+  3 $credentials = [
+  4     'username' => 'Test',
+  5     'password' => '123123',
+  6 ];
+
+
+Змінимо файл index.php та додамо обмеження до сторінок незалогіненим користувачам.
+
+
+  1 <?php
+  2
+  3 session_start();
+  4 $request = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+  5 $page = $request ?: '/';
+  6
+  7 $allowedWithoutAuth = ['/login', '/'];
+  8
+  9 require_once("includes/header.php");
+ 10
+ 11 if (!isset($_SESSION['username']) && !in_array($page, $allowedWithoutAuth)) {
+ 12     require_once("pages/page404.php");
+ 13     exit;
+ 14 }
+ 15
+ 16 switch ($page) {
+ 17     case "/":
+ 18         require_once("pages/main.php");
+ 19         break;
+ 20     case "/basket":
+ 21         require_once("pages/basket.php");
+ 22         break;
+ 23     case "/products":
+ 24         require_once("pages/products.php");
+ 25         break;
+ 26     case "/login":
+ 27         require_once("pages/login.php");
+ 28         break;
+ 29     case "/profile":
+ 30         require_once("pages/user_profile.php");
+ 31         break;
+ 32     default:
+ 33         require_once("pages/page404.php");
+ 34         break;
+ 35 }
+ 36
+ 37 require_once("includes/footer.php");
+ 38
+ 39 ?>
+
+
+Створимо файл logout.php, в якому знаходиться логіка виходу з сесії.
+
+
+  1 <?php
+  2
+  3 session_start();
+  4 unset($_SESSION['username'], $_SESSION['authorized_at']);
+  5 header('Location: /');
+  6 exit;
+
+
+Створимо файл profile.php, в якому зберігається інформація про користувача.
+
+
+  1 <?php
+  2 return array (
+  3   'name' => 'Hello',
+  4   'surname' => 'World',
+  5   'date_of_birth' => '2000-02-16',
+  6   'description' => '111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111',
+  7   'photo' => 'assets/photo_682ae01f47b08.png',
+  8 );
+4 ВИСНОВКИ
+У результаті виконання лабораторної роботи було створено робочий сайту з інтернет магазином «Продовольчий магазин "Весна"» на мові php.
+ДОДАТОК А
+Відеозапис
+Відеозапис презентації результатів лабораторної роботи: https://www.youtube.com/watch?v=KKvPLGxCaS4
+Хронологічний опис відеозапису:
+00:00 — Вступ
+00:07 — Як працює програма
+03:30 — Цікаві ділянки коду
+ДОДАТОК В
+Програмний код
+В.1 login.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab4/smp-pzpi-23-4-fedkova-kateryna-lab4/pages/login.php
+
+
+  1 <?php
+  2
+  3 require 'credential.php';
+  4
+  5 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['username']) && isset($_POST['password'])) {
+  6   $formUsername = $_POST['username'];
+  7   $formPassword = $_POST['password'];
+  8   if (isset($credentials['username'], $credentials['password'])) {
+  9     if ($credentials['username'] == $formUsername && $credentials['password'] == $formPassword) {
+ 10       $_SESSION['username'] = $formUsername;
+ 11               $_SESSION['authorized_at'] = date("Y-m-d H:i:s");
+ 12       header('Location: /products');
+ 13       exit;
+ 14     }
+ 15     else {
+ 16       $_SESSION['form_error'] = 'Відбулась помилка';
+ 17     }
+ 18   }
+ 19   else {
+ 20     $_SESSION['form_error'] = 'Відбулась помилка';
+ 21   }
+ 22 }
+ 23
+ 24 $formError = $_SESSION['form_error'] ?? '';
+ 25 unset($_SESSION['form_error']);
+ 26
+ 27 ?>
+ 28
+ 29 <!DOCTYPE html>
+ 30 <html lang="en">
+ 31 <head>
+ 32     <meta charset="UTF-8">
+ 33     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ 34     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 35     <title>Весна</title>
+ 36     <link rel="stylesheet" href="/css/styles.css">
+ 37     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+ 38     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+ 39     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+ 40 </head>
+ 41 <body>
+ 42
+ 43     <main>
+ 44
+ 45       <?php if ($formError): ?>
+ 46         <div class="alert alert-danger text-center"><?php echo $formError; ?></div>
+ 47       <?php endif; ?>
+ 48
+ 49
+ 50       <form method="POST" action="">
+ 51       <div class="container d-flex justify-content-center align-items-center mt-5">
+ 52         <div class="card shadow p-4" style="width: 100%; max-width: 400px;">
+ 53           <h2 class="text-center mb-4">Вхід до системи</h2>
+ 54           <form method="post" action="login_handler.php">
+ 55             <div class="mb-3">
+ 56               <input type="text" placeholder="User Name" class="form-control" name="username" required>
+ 57             </div>
+ 58             <div class="mb-3">
+ 59               <input type="password" placeholder="Password" class="form-control" name="password" required>
+ 60             </div>
+ 61             <button type="submit" class="btn btn-primary w-100">Login</button>
+ 62           </form>
+ 63         </div>
+ 64       </div>
+ 65       </form>
+ 66
+ 67     </main>
+ 68
+ 69 </body>
+ 70 </html>
+
+
+В.2 user_profile.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab4/smp-pzpi-23-4-fedkova-kateryna-lab4/pages/user_profile.php
+
+
+  1 <?php
+  2
+  3 $errors = [];
+  4
+  5 $userProfile = require 'profile.php';
+  6
+  7 $name = $userProfile['name'] ?? '';
+  8 $surname = $userProfile['surname'] ?? '';
+  9 $date_of_birth = $userProfile['date_of_birth'] ?? '';
+ 10 $description = $userProfile['description'] ?? '';
+ 11 $photo = $userProfile['photo'] ?? '';
+ 12
+ 13
+ 14 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+ 15     $name = trim($_POST['name'] ?? '');
+ 16     $surname = trim($_POST['surname'] ?? '');
+ 17     $date_of_birth = $_POST['date_of_birth'] ?? '';
+ 18     $description = trim($_POST['description'] ?? '');
+ 19
+ 20     if ($name === '' || $surname === '' || $date_of_birth === '' || $description === '') {
+ 21         $errors[] = "Fields can't be empty";
+ 22     }
+ 23     if (strlen($name) < 2) {
+ 24         $errors[] = "Довижина імені має бути більше 1";
+ 25     }
+ 26     if (strlen($surname) < 2) {
+ 27         $errors[] = "Довижина імені має бути більше 1";
+ 28     }
+ 29
+ 30     $birthDateTime = DateTime::createFromFormat('Y-m-d', $date_of_birth);
+ 31     if (!$birthDateTime) {
+ 32         $errors[] = "Неправильний формат дати";
+ 33     } else {
+ 34         $age = (new DateTime())->diff($birthDateTime)->y;
+ 35         if ($age < 16) {
+ 36             $errors[] = "Користувач не можу бути молодше 16";
+ 37         }
+ 38     }
+ 39
+ 40     if (strlen($description) < 50) {
+ 41         $errors[] = "Опис має містити хоча б 50 символів";
+ 42     }
+ 43
+ 44     if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK && $photo == '') {
+ 45         $errors[] = "Фото не завантажено";
+ 46     }
+ 47     if ($photo == '') {
+ 48         $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+ 49         $fileType = mime_content_type($_FILES['file']['tmp_name']);
+ 50
+ 51         if (!in_array($fileType, $allowedTypes)) {
+ 52             $errors[] = "Тип файлу не підтримується";
+ 53         } else {
+ 54             $uploadDir = './assets/';
+ 55             $fileName = uniqid('photo_') . '.' . path_info($_FILES['file']['name'], PATHINFO_EXTENSION);
+ 56             $filePath = $uploadDir . $fileName;
+ 57             if (!move_uploaded_file($_FILES['file']['tmp_name'], $filePath)) {
+ 58               $errors[] = "Помилка при збережені файлу";
+ 59             }
+ 60             $fileName =  'assets/' . $fileName;
+ 61         }
+ 62     }
+ 63
+ 64     elseif ($photo != '') {
+ 65       $fileName = $photo;
+ 66     }
+ 67
+ 68     if (empty($errors)) {
+ 69         $profileData = [
+ 70             'name' => $name,
+ 71             'surname' => $surname,
+ 72             'date_of_birth' => $date_of_birth,
+ 73             'description' => $description,
+ 74             'photo' => $fileName,
+ 75         ];
+ 76
+ 77         $phpCode = "<?php\nreturn " . var_export($profileData, true) . ";\n";
+ 78         file_put_contents('./profile.php', $phpCode);
+ 79         $userProfile = require 'profile.php';
+ 80         $name = $userProfile['name'] ?? '';
+ 81         $surname = $userProfile['surname'] ?? '';
+ 82         $date_of_birth = $userProfile['date_of_birth'] ?? '';
+ 83         $description = $userProfile['description'] ?? '';
+ 84         $photo = $userProfile['photo'] ?? '';
+ 85     }
+ 86 }
+ 87
+ 88 ?>
+ 89
+ 90 <!DOCTYPE html>
+ 91 <html lang="en">
+ 92 <head>
+ 93     <meta charset="UTF-8">
+ 94     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ 95     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 96     <title>Весна</title>
+ 97     <link rel="stylesheet" href="/css/styles.css">
+ 98     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+ 99     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+100     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+101   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+102
+103 </head>
+104 <body>
+105
+106     <main>
+107
+108     <?php if (!empty($errors)): ?>
+109       <div class="alert alert-danger alert-dismissible fade show" role="alert">
+110         <?php foreach ($errors as $error): ?>
+111           <div><?php echo htmlspecialchars($error); ?></div>
+112         <?php endforeach; ?>
+113         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+114       </div>
+115     <?php endif; ?>
+116
+117
+118
+119     <form method="POST" action="" enctype="multipart/form-data">
+120       <div class="container mt-5">
+121         <div class="row">
+122           <div class="col-md-4 d-flex flex-column align-items-center">
+123             <?php if (!empty($photo)) : ?>
+124               <div style="width: 250px; height: 250px; margin-bottom: 0;">
+125                 <img src="<?php echo $photo; ?>" alt="User Photo" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;">
+126               </div>
+127             <?php else : ?>
+128               <div class="border p-3 d-flex justify-content-center align-items-center" style="width: 250px; height: 250px; margin-bottom: 0;">
+129                 <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="currentColor" class="bi bi-image" viewBox="0 0 16 16">
+130                   <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+131                   <path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2h-13zm13 1a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h13z"/>
+132                 </svg>
+133               </div>
+134             <?php endif; ?>
+135
+136             <div class="file-upload-wrapper">
+137               <label class="custom-file-upload">
+138                 Upload
+139                 <input name="file" type="file" />
+140               </label>
+141             </div>
+142           </div>
+143
+144           <div class="col-md-8">
+145             <div class="row g-3">
+146               <div class="col-md-4">
+147                 <label for="name" class="form-label">Name</label>
+148                 <input type="text" name="name" class="form-control" value="<?php echo $name; ?>">
+149               </div>
+150               <div class="col-md-4">
+151                 <label for="surname" class="form-label">Surname</label>
+152                 <input type="text" name="surname" class="form-control" value="<?php echo $surname; ?>">
+153               </div>
+154               <div class="col-md-4">
+155                 <label for="birthdate" class="form-label">Date of birth</label>
+156                 <input type="date" name="date_of_birth" class="form-control" value="<?php echo $date_of_birth; ?>">
+157               </div>
+158             </div>
+159
+160             <div class="form-group mt-4">
+161               <label for="description" class="form-label">Brief description</label>
+162               <textarea class="form-control" name="description" rows="5"><?php echo $description; ?></textarea>
+163             </div>
+164           </div>
+165         </div>
+166
+167         <div class="d-flex justify-content-end mt-3">
+168           <button type="submit" class="btn btn-primary ms-2">Save</button>
+169         </div>
+170       </div>
+171     </form>
+172
+173     </main>
+174
+175 </body>
+176 </html>
+
+
+В.4 credential.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab4/smp-pzpi-23-4-fedkova-kateryna-lab4/credential.php
+
+
+  1 <?php
+  2
+  3 $credentials = [
+  4     'username' => 'Test',
+  5     'password' => '123123',
+  6 ];
+
+
+В.5 index.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab4/smp-pzpi-23-4-fedkova-kateryna-lab4/index.php
+  1 <?php
+  2
+  3 session_start();
+  4 $request = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+  5 $page = $request ?: '/';
+  6
+  7 $allowedWithoutAuth = ['/login', '/'];
+  8
+  9 require_once("includes/header.php");
+ 10
+ 11 if (!isset($_SESSION['username']) && !in_array($page, $allowedWithoutAuth)) {
+ 12     require_once("pages/page404.php");
+ 13     exit;
+ 14 }
+ 15
+ 16 switch ($page) {
+ 17     case "/":
+ 18         require_once("pages/main.php");
+ 19         break;
+ 20     case "/basket":
+ 21         require_once("pages/basket.php");
+ 22         break;
+ 23     case "/products":
+ 24         require_once("pages/products.php");
+ 25         break;
+ 26     case "/login":
+ 27         require_once("pages/login.php");
+ 28         break;
+ 29     case "/profile":
+ 30         require_once("pages/user_profile.php");
+ 31         break;
+ 32     default:
+ 33         require_once("pages/page404.php");
+ 34         break;
+ 35 }
+ 36
+ 37 require_once("includes/footer.php");
+ 38
+ 39 ?>
+
+
+В.6 logout.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab4/smp-pzpi-23-4-fedkova-kateryna-lab4/logout.php
+
+
+  1 <?php
+  2
+  3 session_start();
+  4 unset($_SESSION['username'], $_SESSION['authorized_at']);
+  5 header('Location: /');
+  6 exit;
+
+
+В.7 profile.php
+GitHub репозиторій: https://github.com/NureFedkovaKateryna/smp-pzpi-23-4-fedkova-kateryna/tree/main/Lab4/smp-pzpi-23-4-fedkova-kateryna-lab4/profile.php
+
+
+  1 <?php
+  2 return array (
+  3   'name' => 'Hello',
+  4   'surname' => 'World',
+  5   'date_of_birth' => '2000-02-16',
+  6   'description' => '111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111',
+  7   'photo' => 'assets/photo_682ae01f47b08.png',
+  8 );
